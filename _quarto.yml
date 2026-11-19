@@ -13,3 +13,6 @@ format:
     code-tools: true
     embed-resources: true
     theme: cosmo
+
+execute:
+  warning: false

@@ -72,12 +72,21 @@ visits_summary <- data |>
     max    = max(visits)
   )
 
+# making it a proper table
 gt(visits_summary)
 
 ```
 
+```{r descriptive plot}
+#| echo: FALSE
 
+# Creating a plot of the overall distribution of the outcome variable (number of visits)
+descriptive_plot <- ggplot(data, aes(x = visits)) +
+  geom_bar() +
+  labs(x = "Number of visits", y = "Number of People")
 
-how do i supress all the warnings from showing up in my quarto?
+descriptive_plot
+```
 
-git remote add origin https://github.com/LaylaHussainuwo/hussain-lab-05.git
+The visits outcome **is a count.** Whole numbers, bounded at zero, and right-skewed. **The variance (`r round(visits_summary$var, 2)`) is about `r round(visits_summary$var / visits_summary$mean, 2)` times the mean (`r round(visits_summary$mean, 2)`).** **`r round(100 * visits_summary$p_zero)`% of people had no visits.** The greatest number of visits reported is **(`r round(visits_summary$max, 2)`)**is a shockingly large number, but could be legitimate. 
+

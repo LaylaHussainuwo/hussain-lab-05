@@ -1,0 +1,9 @@
+[
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Hussain-lab-05",
+    "section": "",
+    "text": "The NMES1988 data describe 4,406 adults aged 66 and older from the 1987–1988 US National Medical Expenditure Survey. It details several variables with the outcome variable being number of physician office visits. The rest are listed below\n\n\n\n\n\n\n\nVariable\nDescription\n\n\n\n\nvisits\nOutcome: physician office visits between 1987 and 1988\n\n\nchronic\nNumber of chronic conditions\n\n\nhealth\nSelf-perceived health: poor, average, or excellent\n\n\ngender\nmale of female\n\n\nschool\nYears of education\n\n\ninsurance\nCovered by private insurance: no or yes\n\n\n\nReference groups are Average health, Male, and No insurance.\n\n\n\n\n\n\n\n\n\nn\nmean\nvar\np_zero\nmax\n\n\n\n\n4406\n5.774399\n45.68712\n0.1550159\n89\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nThe visits outcome is a count. Whole numbers, bounded at zero, and right-skewed. The variance (45.69) is about 7.91 times the mean (5.77). 16% of people had no visits. The greatest number of visits reported is (89) This is a shockingly large number, but could be legitimate."
+  }
+]
