@@ -1,0 +1,83 @@
+---
+title: "Hussain-lab-05"
+format: html
+editor: visual
+---
+
+```{r, set up}
+#| echo: FALSE
+
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggeffects)
+library(emmeans)
+library(performance)
+library(broom.mixed)
+library(gt)
+library(AER)
+
+```
+
+```{r, dataset setup}
+#| echo: FALSE
+
+# Data loading
+
+data("NMES1988")
+
+data <- NMES1988
+
+# Selecting my variables of interest 
+
+data <- data |>
+  select(visits, chronic, health, gender, school, insurance) |> 
+
+#Assigning reference groups of Men and Single
+  
+  mutate(
+    health = fct_relevel(factor(health), "average"),
+    gender = fct_relevel(factor(gender), "male"),
+    insurance = fct_relevel(factor(insurance), "no")
+  )
+
+```
+
+The `NMES1988` data describe 4,406 adults aged 66 and older from the 1987–1988 US National Medical Expenditure Survey. It details several variables with the outcome variable being number of physician office visits. The rest are listed below
+
+| Variable    | Description                                                |
+|-------------|------------------------------------------------------------|
+| `visits`    | **Outcome:** physician office visits between 1987 and 1988 |
+| `chronic`   | Number of chronic conditions                               |
+| `health`    | Self-perceived health: `poor`, `average`, or `excellent`   |
+| `gender`    | `male` of `female`                                         |
+| `school`    | Years of education                                         |
+| `insurance` | Covered by private insurance: `no` or `yes`                |
+
+Reference groups are **Average** health, **Male**, and **No** insurance.
+
+------------------------------------------------------------------------
+
+```{r describe}
+#| echo: FALSE
+
+# Describe the data
+
+visits_summary <- data |>
+  summarise(
+    n      = n(),
+    mean   = mean(visits),
+    var    = var(visits),
+    p_zero = mean(visits == 0),
+    max    = max(visits)
+  )
+
+gt(visits_summary)
+
+```
+
+
+
+how do i supress all the warnings from showing up in my quarto?
+
+git remote add origin https://github.com/LaylaHussainuwo/hussain-lab-05.git
