@@ -387,7 +387,6 @@ and Hurdle NB models to see if the fit is improved and the zero-inflation is res
 
 ```{r zero-models}
 #| echo: FALSE
-#| eval: false
 
 # Zero-inflated NB with a constant zero-inflation probability
 m_zinb <- glmmTMB(
@@ -417,12 +416,56 @@ anova(neg_binom, m_zinb_full)
 AIC(neg_binom, m_zinb, m_zinb_full, m_hurd)
 BIC(neg_binom, m_zinb, m_zinb_full, m_hurd)
 
-# Then re-check the chosen model with DHARMa
+# Then re-check the chosen model with DHARMa - for zinb_full
 set.seed(500)
 res_zinb <- simulateResiduals(m_zinb_full, n = 500, plot = FALSE)
 testZeroInflation(res_zinb)
 
+# Then re-check the chosen model with DHARMa - this time for the hurdle model
+set.seed(500)
+res_hurd <- simulateResiduals(m_hurd, n = 500, plot = FALSE)
+testZeroInflation(res_hurd)
 
 ```
 
+I will carry forward the hurdle negative binomial model for a few reasons. Initially, the ZINB-full model was found to fit significantly better than the ordinary negative binomial model. This was a good first step of providing evidence that adding the zero-inflation component improves the model.The DHARMa result for the ZINB-full model was ratioObsSim = 0.95671, p = 0.176. The p being > .05, indicated there was no statistically significant evidence of remaining zero inflation. I then conducted the same test for the hurdle model and found that the results were ratioObsSim = 0.99928, p = 1. Since p > .05 again, this meant that there was no statistically significant evidence of remaining zero inflation for the hurdle model either. Because both the ZINB-full and hurdle models passed the DHARMa zero-inflation test, the decision for which model to select is now based on the AIC/BIC comparison of the two model options. The comparison showed that the hurdle model had the lowest AIC (24,330.41) and BIC (24,426.27) of all four models. Thus, I choose to carry forward the hurdle model. 
+
+
+# Part 6: Testing and probing an interaction
+
+Question: Does the association between the number of chronic conditions and physician visits differ for people based on gender? 
+
+I predict that the association between number of chronic conditions and physician visits differs for male and female patients such that female patients will have a weaker association between the predictor and the outcome variable.  My thinking here is that female health is not well understood in many domains, so while a female patients may be attending many visits to the doctor, they may not be able to report an accurate number of chronic conditions due to the fact that physicians may not provide adequate diagnoses. This would probably be especially true for female patients in the window of time we are examining (1987–1988). 
+
+
+```{r int-fit}
+#| echo: FALSE
+
+# NB model with a chronic x gender interaction.
+
+# chronic * gender expands to chronic + gender + chronic:gender, so both main effects and the product term are included automatically.
+
+# The other predictors (health, school, insurance) are controls.
+
+interact <- glmmTMB(
+  visits ~ health + school + insurance + chronic * gender,
+  data   = data,
+  family = nbinom2(link = "log")
+)
+  
+summary(interact)
+
+```
+
+
+```{r interact lrt}
+#| echo: FALSE
+
+# LRT: does adding the chronic x gender interaction improve fit over the additive NB?
+lrt_int <- anova(neg_binom, interact)
+lrt_int
+
+```
+
+The interaction is not significant here (*p* = `r round(lrt_int[2, "Pr(>Chisq)"], 3)`). We probe it below anyway.
 
