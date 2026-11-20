@@ -272,3 +272,157 @@ Its performance is:
 - AIC = **`r round(AIC(selected_model), 3)`**
 - BIC = **`r round(BIC(selected_model), 3)`**
 
+```{r poisson dharma}
+#| echo: FALSE
+
+# Seed was always set to 500 for this whole document. 
+set.seed(500)
+
+# Simulates 500 new datasets from the fitted full poisson model.
+res_pois <- simulateResiduals(full, n = 500, plot = FALSE)
+
+#  QQ plot and residuals vs. predicted values
+plot(res_pois)
+
+```
+```{r, pois-dispersion}
+#| echo: FALSE
+
+# Dispersion test
+
+disp_pois <- testDispersion(res_pois)
+disp_pois
+
+```
+
+```{r, poisson zeros}
+#| echo: FALSE
+
+# Zero-inflation test
+
+zi_pois <- testZeroInflation(res_pois)
+zi_pois
+
+```
+
+
+The DHARMa plots suggest that the Poisson model is a poor fit. The dispersion ratio is `r round(disp_pois$statistic, 2)` (`r ifelse(disp_pois$p.value < .001, "*p* < .001", paste0("*p* = ", round(disp_pois$p.value, 3)))`), and there are `r round(zi_pois$statistic, 2)` times as many zeros as the Poisson expects. The observed data are more variable than a Poisson allows. 
+
+The over dispersion observed here matters because it means that the assumption that the variance is equal to the mean has been violated. In this case the variance is underestimated, meaning that model's standard errors are too small, the confidence intervals are too narrow, and the *p*-values are too small. I would not move straight to a zero-inflated model based on this zero-inflation test alone because the test only tells me that there are more zeros than the Poisson expects, it does not tell me if these zeros are coming from structural reasons (i.e. some people have no reason to visit a doctor during this period). Whether the zeros are structural or not will define if I should move to a  zero-inflated model. 
+
+```{r, nb}
+#| echo: FALSE
+
+# Negative binomial (NB2) model
+neg_binom <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  data   = data,
+  family = nbinom2(link = "log")
+)
+
+summary(neg_binom)
+
+# LRT
+lrt_nb<-anova(full, neg_binom)
+lrt_nb
+
+```
+
+The negative binomial model fit significantly better than the full Poisson model, χ²(`r lrt_nb[2, "Chi Df"]`) = `r round(lrt_nb[2, "Chisq"], 2)`, `r ifelse(lrt_nb[2, "Pr(>Chisq)"] < .001, "*p* < .001", paste0("*p* = ", round(lrt_nb[2, "Pr(>Chisq)"], 3)))`.
+
+This test has 1 degree of freedom because the negative binomial model adds more more layer of complexity by adding one parameter that describes the extra variability in the data. Yes, the  NB2 fit significantly better than the Poisson. This is evidenced by the large reduction in AIC and BIC and the significance of the LRT test. This tells us that adding complexity to the model didn't take away from the significance of the relationship. The NB2 resolved our over dispersion issue, but our issue of excess zero may remain. 
+
+
+```{r, nb-dharma}
+#| echo: FALSE
+
+# Same seed as before
+
+set.seed(500)
+
+# If the NB is adequate, these should now be uniform, unlike the Poisson's.
+res_nb <- simulateResiduals(neg_binom, n = 500, plot = FALSE)
+
+# QQ plot: points should now sit close to the diagonal.
+# Residuals vs. predicted: should be roughly flat.
+plot(res_nb)
+
+```
+
+```{r, nb-tests}
+#| echo: FALSE
+
+disp_nb <- testDispersion(res_nb)
+
+# Zero inflation
+zi_nb <- testZeroInflation(res_nb)
+
+```
+
+The NB resolved the over dispersion: the dispersion ratio is now `r round(disp_nb$statistic, 2)` (`r ifelse(disp_nb$p.value < .001, "*p* < .001", paste0("*p* = ", round(disp_nb$p.value, 3)))`), close to 1 and non-significant.
+
+```{r nb-pred-plot}
+#| echo: FALSE
+
+# Predicted mean visit counts from the additive NB, on the count scale.
+# "chronic [0:20]" plots chronic conditions from 0 to 20.
+
+pred_nb <- predict_response(neg_binom, terms = "chronic [0:20]")
+
+plot(pred_nb) +
+  labs(
+    title = "Predicted visit counts by number of chronic conditions",
+    x     = "Chronic conditions", y = "Predicted visits"
+  )
+
+```
+
+The line curves upward even though the model is linear in its predictors because of the the log link: each additional chronic condition adds a constant amount on the log scale, multiplying the expected count, so the same one-condition increase adds more visits when the expected count is already high.
+
+# Part 5: Do the zeros need their own model?
+
+Given that my NB2 zero-inflation test produced a significant result, I will test ZINB
+and Hurdle NB models to see if the fit is improved and the zero-inflation is resolved. 
+
+
+```{r zero-models}
+#| echo: FALSE
+#| eval: false
+
+# Zero-inflated NB with a constant zero-inflation probability
+m_zinb <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  ziformula = ~ 1,
+  data = data, family = nbinom2()
+)
+
+# Zero-inflated NB with predictors in the zero part
+m_zinb_full <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  ziformula = ~ chronic + health + gender + school + insurance,
+  data = data, family = nbinom2()
+)
+
+# Hurdle NB
+m_hurd <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  ziformula = ~ chronic + health + gender + school + insurance,
+  data = data, family = truncated_nbinom2()
+)
+
+# Compare models
+anova(neg_binom, m_zinb_full)
+
+# The hurdle isn't nested in the NB, so compare with AIC/BIC (lower = better)
+AIC(neg_binom, m_zinb, m_zinb_full, m_hurd)
+BIC(neg_binom, m_zinb, m_zinb_full, m_hurd)
+
+# Then re-check the chosen model with DHARMa
+set.seed(500)
+res_zinb <- simulateResiduals(m_zinb_full, n = 500, plot = FALSE)
+testZeroInflation(res_zinb)
+
+
+```
+
+
