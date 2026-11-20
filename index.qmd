@@ -56,7 +56,6 @@ The `NMES1988` data describe 4,406 adults aged 66 and older from the 1987–1988
 
 Reference groups are **Average** health, **Male**, and **No** insurance.
 
-------------------------------------------------------------------------
 
 ```{r describe}
 #| echo: FALSE
@@ -86,7 +85,190 @@ descriptive_plot <- ggplot(data, aes(x = visits)) +
   labs(x = "Number of visits", y = "Number of People")
 
 descriptive_plot
+
 ```
 
-The visits outcome **is a count.** Whole numbers, bounded at zero, and right-skewed. **The variance (`r round(visits_summary$var, 2)`) is about `r round(visits_summary$var / visits_summary$mean, 2)` times the mean (`r round(visits_summary$mean, 2)`).** **`r round(100 * visits_summary$p_zero)`% of people had no visits.** The greatest number of visits reported is **(`r round(visits_summary$max, 2)`)**is a shockingly large number, but could be legitimate. 
+The visits outcome **is a count.** Whole numbers, bounded at zero, and right-skewed. **The variance (`r round(visits_summary$var, 2)`) is about `r round(visits_summary$var / visits_summary$mean, 2)` times the mean (`r round(visits_summary$mean, 2)`).** **`r round(100 * visits_summary$p_zero)`% of people had no visits.** The greatest number of visits reported **(`r round(visits_summary$max, 2)`)**is a shockingly large number, but could be legitimate. 
+
+```{r, gaussian model test}
+#| echo: FALSE
+
+# Fiting a Gaussian model
+
+m_gauss <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  data = data,
+  family = gaussian(link = "identity")
+)
+
+#simulation 
+set.seed(500)
+res_gauss <- simulateResiduals(m_gauss, n = 500, plot = FALSE)
+plot(res_gauss)
+
+```
+
+
+A linear model is a poor choice for the visits outcome variable because the visits data are counts, meaning that negative visits and half visits are impossible/meaningless values. This is evidenced by the DHARMa simulations. The residuals, shown in the QQ plot, do not follow the expected flat diagonal line. The outlier and KS tests also speak to this concern. In the residual-vs-predicted plot, as the predicted probability approaches 1, the distribution becomes more compressed toward the lower end of residual values. This is also evidenced by the red 0.5 quantile line. Taken together, its clear these data are not a good fit for a Gaussian model. 
+
+
+```{r poisson null}
+#| echo: FALSE
+
+# Null (intercept-only) Poisson model: no predictors
+null <- glmmTMB(
+  visits ~ 1, 
+  data = data, 
+  family = poisson(link = "log"))
+
+# One-predictor Poisson model: Does having a chronic condition predict visit counts?
+chronic_pred <- glmmTMB(
+  visits ~ chronic, 
+  data = data, 
+  family = poisson(link = "log"))
+
+
+# Full Poisson model: all five predictors at once. Chronic, health, gender, school, insurance explain additional variation. 
+full <- glmmTMB(
+  visits ~ chronic + health + gender + school + insurance,
+  data = data,
+  family = poisson(link = "log"))
+
+```
+
+
+```{r, anova tests}
+#| echo: FALSE
+
+tests <- anova(null, chronic_pred, full)
+
+```
+
+```{r, prepare tests}
+#| echo: FALSE
+
+tests <- tests |>
+  select(Chisq, `Chi Df`, `Pr(>Chisq)`) |>
+  rename(
+    Nested.df = `Chi Df`,
+    Nested.Chisq.stat = Chisq,
+    Nested.p.value = `Pr(>Chisq)`)
+
+```
+
+```{r, extract model metrics}
+#| echo: FALSE
+
+glance0 <- broom.mixed::glance(null)
+glance1 <- broom.mixed::glance(chronic_pred)
+glance2 <- broom.mixed::glance(full)
+
+```
+
+```{r, combine model metrics}
+#| echo: FALSE
+
+mods <- c(
+  "M0: Null",
+  "M1: Chronic_pred",
+  "M2: Full")
+
+glances <- rbind(
+  glance0,
+  glance1,
+  glance2)
+```
+
+```{r, combine comparisons}
+#| echo: FALSE
+
+comparison_table <- cbind(
+  Model = mods,
+  glances,
+  tests)
+
+```
+
+```{r, model comparison table}
+#| echo: FALSE
+
+comparison_table |>
+  select(
+    Model,
+    AIC,
+    BIC,
+    logLik,
+    deviance,
+    df.residual,
+    Nested.df,
+    Nested.Chisq.stat,
+    Nested.p.value
+  ) |>
+  gt() |>
+  cols_label(
+    Model = "Model",
+    AIC = "AIC",
+    BIC = "BIC",
+    logLik = "Log-likelihood",
+    deviance = "Deviance",
+    df.residual = "Residual.df",
+    Nested.df = "Nested df",
+    Nested.Chisq.stat = "Nested χ²",
+    Nested.p.value = "Nested p"
+  ) |>
+  fmt_number(
+    columns = c(
+      AIC,
+      BIC,
+      logLik,
+      deviance,
+      Nested.Chisq.stat
+    ),
+    decimals = 3
+  ) |>
+  fmt(
+    columns = Nested.p.value,
+    fns = function(x) {
+      ifelse(
+        is.na(x),
+        "—",
+        ifelse(x < .001, "< .001", sprintf("%.3f", x))
+      )
+    }
+  ) |>
+  sub_missing(
+    columns = c(Nested.df, Nested.Chisq.stat),
+    missing_text = "—"
+  )
+
+```
+
+For the comparison between M0 and M1, nested χ² = 2,175.428, p <.001. For the comparison between M1 and M2, nested χ² = 959.924, p <.001. Both of these likelihood-ratio tests indicate a statistically significant improvement in model fit. This means that adding the additional predictors improved the model fit across both comparisons, suggesting that M2 is a better fit model than M1 and M0. Further, the AIC and BIC decreased for both comparisons, once again implying that M2 is a good model to select. For these reasons, I have selected M2 as the ideal model.  
+
+```{r, select model}
+#| echo: FALSE
+
+selected_row <- comparison_table |>
+  filter(Nested.p.value < .05) |>
+  slice_tail(n = 1)
+
+#creating an object with our selected model's name for dynamic reporting
+selected_name <- selected_row$Model
+
+#case matching for dynamic reporting
+selected_model <- switch(
+  selected_name,
+  "M0: Null" = null,
+  "M1: Chronic_pred" = chronic_pred,
+  "M2: Full" = full,
+  )
+
+```
+
+The provisionally selected model is **`r selected_name`**.
+
+Its performance is:
+
+- AIC = **`r round(AIC(selected_model), 3)`**
+- BIC = **`r round(BIC(selected_model), 3)`**
 
