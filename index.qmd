@@ -4,6 +4,8 @@ format: html
 editor: visual
 ---
 
+# Part 1: Configuring my project and examining the data
+
 ```{r, set up}
 #| echo: FALSE
 
@@ -90,10 +92,12 @@ descriptive_plot
 
 The visits outcome **is a count.** Whole numbers, bounded at zero, and right-skewed. **The variance (`r round(visits_summary$var, 2)`) is about `r round(visits_summary$var / visits_summary$mean, 2)` times the mean (`r round(visits_summary$mean, 2)`).** **`r round(100 * visits_summary$p_zero)`% of people had no visits.** The greatest number of visits reported **(`r round(visits_summary$max, 2)`)**is a shockingly large number, but could be legitimate. 
 
+# Part 2: Specifying competing count models
+
 ```{r, gaussian model test}
 #| echo: FALSE
 
-# Fiting a Gaussian model
+# Fitting a Gaussian model
 
 m_gauss <- glmmTMB(
   visits ~ chronic + health + gender + school + insurance,
@@ -245,6 +249,8 @@ comparison_table |>
 
 For the comparison between M0 and M1, nested χ² = 2,175.428, p <.001. For the comparison between M1 and M2, nested χ² = 959.924, p <.001. Both of these likelihood-ratio tests indicate a statistically significant improvement in model fit. This means that adding the additional predictors improved the model fit across both comparisons, suggesting that M2 is a better fit model than M1 and M0. Further, the AIC and BIC decreased for both comparisons, once again implying that M2 is a good model to select. For these reasons, I have selected M2 as the ideal model.  
 
+# Part 3: Evaluating the Poisson model
+
 ```{r, select model}
 #| echo: FALSE
 
@@ -309,6 +315,8 @@ zi_pois
 The DHARMa plots suggest that the Poisson model is a poor fit. The dispersion ratio is `r round(disp_pois$statistic, 2)` (`r ifelse(disp_pois$p.value < .001, "*p* < .001", paste0("*p* = ", round(disp_pois$p.value, 3)))`), and there are `r round(zi_pois$statistic, 2)` times as many zeros as the Poisson expects. The observed data are more variable than a Poisson allows. 
 
 The over dispersion observed here matters because it means that the assumption that the variance is equal to the mean has been violated. In this case the variance is underestimated, meaning that model's standard errors are too small, the confidence intervals are too narrow, and the *p*-values are too small. I would not move straight to a zero-inflated model based on this zero-inflation test alone because the test only tells me that there are more zeros than the Poisson expects, it does not tell me if these zeros are coming from structural reasons (i.e. some people have no reason to visit a doctor during this period). Whether the zeros are structural or not will define if I should move to a  zero-inflated model. 
+
+# Part 4: Fitting and evaluating a negative binomial model
 
 ```{r, nb}
 #| echo: FALSE
@@ -559,11 +567,41 @@ contrast_df |>
   )
 ```
 
+My hypothesis was not supported. There was no evidence that the association between the number of chronic conditions and physician visits differed between male and female patients. The likelihood-ratio test indicated that adding the chronic conditions × gender interaction did not significantly improve model fit, χ²(1) = 0.009, p = .924.  Chronic conditions were positively associated with physician visits for both males (b = 0.194, p < .001) and females (b = 0.197, p < .001), but the difference between these slopes was not significant (p = .924). Simple-effects comparisons indicated that females had significantly higher predicted physician visit counts than males but, these gender differences did not significantly vary with the number of chronic conditions. So, I am not very confident in this interaction since neither the omnibus nor the probing supported my hypothesis.
 
-Write a paragraph addressing the following:
-•	Is there evidence that the association between chronic conditions and visits differs across your chosen predictor2?
-•	How confident are you in this interaction, given the omnibus test and the probing results?
-
+# Part 7: My findings
 
 
-layla - decide if you have time to further customize the interaction plot
+
+
+Write an APA-style results section in three paragraphs. Use inline R code.
+
+Paragraph 1: Model selection. Describe the outcome and how you arrived at your final model. Report:
+•	The mean, variance, and percentage of zeros for the outcome.
+•	The Poisson model’s DHARMa dispersion ratio and zero-inflation ratio, with p-values.
+•	The LRT comparing the Poisson and NB2 (χ², df, p).
+•	The NB2’s dispersion and zero-inflation ratios, with p-values, and whether a separate model for the zeros was needed.
+
+Paragraph 2: Main effects. Report the results of your selected model. For each predictor, give:
+•	The coefficient (b), 95% CI, and p-value.
+•	A plain-language interpretation of the direction of the association (e.g., “women published fewer articles than men”).
+State what is held constant, and identify which predictors were not significant.
+
+Paragraph 3: Interaction. Report:
+•	The LRT comparing the additive and interaction models (χ², df, p).
+•	The simple slopes of chronic within each level of predictor2 (b, 95% CI, p).
+•	The simple effects of predictor2 at −1 SD, the mean, and +1 SD of chronic (log contrast, p).
+
+Summarize the overall pattern in one sentence. For example, where is the difference between groups largest, and where does it disappear?
+
+
+7.2. Discussion
+What do your results suggest about the relative importance of chronic conditions, self-perceived health, or other variables regarding how often older adults visit a physician? What are the main limitations of this analysis?
+
+example 
+
+Article counts were overdispersed (*M* = 1.69, *s*² = 3.71; 30% zeros). Simulation-based residual checks on a Poisson model showed significant overdispersion (dispersion ratio = 1.99, *p* \< .001) and excess zeros (observed/expected = 1.44, *p* \< .001). A negative binomial model fit significantly better, χ²(1) = 180.20, *p* \< .001, and showed no remaining evidence of overdispersion (ratio = 1.05, *p* = .556) or excess zeros (ratio = 0.99, *p* = .772), so no separate model for zeros was needed.
+
+Holding other predictors constant, women published fewer articles than men (*b* = −0.22, 95% CI \[−0.36, −0.07\], *p* = .003). Each additional child aged 5 or younger was associated with fewer articles (*b* = −0.18, 95% CI \[−0.28, −0.07\], *p* \< .001), and each additional mentor article with more articles (*b* = 0.029, 95% CI \[0.023, 0.035\], *p* \< .001). Marital status (*b* = 0.15, 95% CI \[−0.01, 0.31\], *p* = .067) and PhD prestige (*b* = 0.02, 95% CI \[−0.06, 0.09\], *p* = .672) were not significantly associated with article counts.
+
+Adding a PhD prestige × gender interaction did not significantly improve fit, χ²(1) = 3.73, *p* = .053. Simple slopes showed that prestige was not significantly associated with article counts for men (*b* = −0.04, 95% CI \[−0.14, 0.05\], *p* = .363) or women (*b* = 0.10, 95% CI \[−0.01, 0.20\], *p* = .084). Simple effects, however, showed that the gender gap narrowed as prestige increased. Men were expected to publish more articles than women at low prestige (−1 *SD*; *b* = 0.36, *p* \< .001) and at average prestige (*b* = 0.22, *p* = .002), but the difference was not significant at high prestige (+1 *SD*; *b* = 0.09, *p* = .354).
