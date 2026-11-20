@@ -457,7 +457,6 @@ summary(interact)
 
 ```
 
-
 ```{r interact lrt}
 #| echo: FALSE
 
@@ -467,5 +466,104 @@ lrt_int
 
 ```
 
-The interaction is not significant here (*p* = `r round(lrt_int[2, "Pr(>Chisq)"], 3)`). We probe it below anyway.
+The interaction model did not significantly improve model fit, 
+χ²(`r lrt_int[["Chi Df"]][2]`) = 
+`r round(lrt_int[["Chisq"]][2], 2)`, 
+*p* = `r round(lrt_int[["Pr(>Chisq)"]][2], 3)`.
 
+```{r, interact plot}
+#| echo: FALSE
+
+# Predicted mean visit counts from the interaction model, on the count scale.
+pred_int <- predict_response(interact, terms = c("chronic", "gender"))
+
+int_plot <- plot(pred_int) +
+  scale_colour_manual(values = c(male = "green4", female = "purple")) +
+  scale_fill_manual(values = c(male = "green4", female = "purple")) +
+  labs(
+    title  = "Predicted visit counts by number of chronic conditions and gender",
+    x      = "Number of Chronic Conditions", y = "Predicted Visits",
+    colour = NULL, fill = NULL
+  )
+
+print(int_plot)
+
+```
+
+```{r int-slopes}
+#| echo: FALSE
+
+# Simple slopes: the slope of chronic estimated separately within each gender.
+slopes <- emtrends(
+  interact, 
+  specs = ~ gender, 
+  var = "chronic")
+
+pairs(slopes)
+
+#test simple slopes against zero
+slopes_sum <- summary(slopes, infer = TRUE)
+slopes_sum
+
+```
+
+```{r, interac simple-effects}
+#| echo: FALSE
+
+chronic_mean <- mean(data$chronic, na.rm = TRUE)
+chronic_sd <- sd(data$chronic, na.rm = TRUE)
+chronic_values <- chronic_mean + c(-1, 0, 1) * chronic_sd
+
+# Estimated marginal means (EMMs) for each gender at each chronic condition value.
+gender_emmeans <- emmeans(
+  interact,
+  specs = ~ gender | chronic,
+  at = list(chronic = chronic_values)
+)
+
+# Estimated mean article counts in each gender x chronic condition cell.
+summary(gender_emmeans, type = "response")
+
+# Gender differences at each chronic condition value, on the log scale.
+pairs(gender_emmeans)
+
+```
+
+The association between chronic conditions and visits is positive and significant for both genders.The p-value of .924 means that the two slopes do not significantly differ. The sign might be flipped because of the order of the subtraction. Since we only have two level for gender. If i called female - male instead, the sign would be positive. The two tests answer the same question with a two-level moderator because there is only one difference between the slopes that we can determine. The emmeans predicted counts differ slightly from the ggeffects plot, and  the contrasts do not because they use different methods, but ultimately the difference remains  the same despite the absolute predictions differing. 
+
+```{r, interaction table}
+#| echo: FALSE
+
+contrast_df <- summary(pairs(gender_emmeans)) |>
+  as.data.frame() |>
+  mutate(
+    chronic_level = c("-1 SD", "Mean", "+1 SD")[match(round(chronic, 6), round(chronic_values, 6))]
+  ) |>
+  select(chronic_level, contrast, estimate, SE, z.ratio, p.value)
+
+contrast_df |>
+  gt() |>
+  cols_label(
+    chronic_level = "Chronic conditions", contrast = "Contrast",
+    estimate = "Log Contrast", SE = "SE", z.ratio = "z", p.value = "p"
+  ) |>
+  fmt_number(columns = c(estimate, SE, z.ratio), decimals = 3) |>
+  fmt(columns = p.value,
+      fns = \(x) scales::pvalue(x, accuracy = 0.001, add_p = FALSE)) |>
+  tab_header(
+    title    = "Simple Effects of Gender Across Chronic Conditions",
+    subtitle = "Negative-binomial regression (log link)"
+  ) |>
+  tab_source_note(
+    "Log contrasts = Male − Female. z-tests and p-values are computed on the log scale."
+  )
+```
+
+
+Write a paragraph addressing the following:
+•	Is there evidence that the association between chronic conditions and visits differs across your chosen predictor2?
+•	How confident are you in this interaction, given the omnibus test and the probing results?
+
+
+
+layla - decide if you have time to further customize the interaction plot
